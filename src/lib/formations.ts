@@ -219,11 +219,11 @@ export function universeFormation(
       // Core stars — bright, warm, vivid
       const brightness = rand(0.7, 1.2) * Math.max(0.4, 1 - r / (R * 0.25));
       const [cR, cG, cB] = starColor(0.1, galaxy.color, galaxy.secondaryColor);
-      colors[i3] = cR * brightness;
-      colors[i3 + 1] = cG * brightness;
-      colors[i3 + 2] = cB * brightness;
+      colors[i3] = cR * brightness * 1.5;
+      colors[i3 + 1] = cG * brightness * 1.5;
+      colors[i3 + 2] = cB * brightness * 1.5;
 
-      scales[idx] = rand(0.15, 0.35) * Math.max(0.4, 1 - r / (R * 0.25));
+      scales[idx] = rand(0.15, 0.4) * Math.max(0.4, 1 - r / (R * 0.25));
       idx++;
     }
 
@@ -290,12 +290,12 @@ export function universeFormation(
       const brightness = Math.max(0.15, Math.exp(-t * 1.8) * 0.9 + 0.12);
       const [sR, sG, sB] = starColor(t, galaxy.color, galaxy.secondaryColor);
 
-      colors[i3] = sR * brightness;
-      colors[i3 + 1] = sG * brightness;
-      colors[i3 + 2] = sB * brightness;
+      colors[i3] = sR * brightness * 1.3;
+      colors[i3 + 1] = sG * brightness * 1.3;
+      colors[i3 + 2] = sB * brightness * 1.3;
 
       // Particles scale with distance — bigger near core, still visible at edges
-      scales[idx] = rand(0.06, 0.18) * Math.max(0.25, 1 - t * 0.4);
+      scales[idx] = rand(0.08, 0.22) * Math.max(0.25, 1 - t * 0.4);
       idx++;
     }
   }
@@ -438,21 +438,21 @@ export function galaxyFormation(
         positions[i3 + 1] = cy;
         positions[i3 + 2] = cz;
         // Boosted brightness (>1.0 triggers bloom glow)
-        colors[i3] = sr * 1.4;
-        colors[i3 + 1] = sg * 1.4;
-        colors[i3 + 2] = sb * 1.4;
-        scales[idx] = rand(0.4, 0.6);
+        colors[i3] = sr * 2.5;
+        colors[i3 + 1] = sg * 2.5;
+        colors[i3 + 2] = sb * 2.5;
+        scales[idx] = rand(0.5, 0.8);
       } else {
         // Halo — tight cluster for glow effect
-        const spread = 0.2;
+        const spread = 0.25;
         positions[i3] = cx + gaussRand() * spread;
         positions[i3 + 1] = cy + gaussRand() * spread * 0.5;
         positions[i3 + 2] = cz + gaussRand() * spread;
-        const fade = rand(0.4, 0.8);
+        const fade = rand(0.6, 1.2);
         colors[i3] = sr * fade;
         colors[i3 + 1] = sg * fade;
         colors[i3 + 2] = sb * fade;
-        scales[idx] = rand(0.08, 0.2);
+        scales[idx] = rand(0.1, 0.25);
       }
       idx++;
     }

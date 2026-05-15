@@ -17,6 +17,7 @@ export interface Planet {
   size: number; // relative scale
   habitable: boolean;
   color: [number, number, number];
+  textureUrl?: string; // AI generated texture
 }
 
 export interface StarSystem {
@@ -29,6 +30,7 @@ export interface StarSystem {
   starColor: [number, number, number];
   hasBlackHole: boolean;
   planets: Planet[];
+  skyboxUrl?: string; // AI generated skybox
 }
 
 export interface Galaxy {

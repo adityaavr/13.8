@@ -10,7 +10,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Suspense } from "react";
 import { ParticleField } from "./particle-field";
@@ -56,13 +56,14 @@ export default function Scene() {
         <CameraController />
         <ClickHandler />
 
-        <EffectComposer>
+        <EffectComposer enableNormalPass={false}>
           <Bloom
-            luminanceThreshold={0.25}
-            luminanceSmoothing={0.9}
-            intensity={1.0}
+            luminanceThreshold={0.45}
+            luminanceSmoothing={0.85}
+            intensity={2.2}
             mipmapBlur
           />
+          <Vignette eskil={false} offset={0.15} darkness={1.2} />
         </EffectComposer>
       </Suspense>
     </Canvas>

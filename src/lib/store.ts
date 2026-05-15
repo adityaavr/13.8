@@ -44,6 +44,8 @@ interface UniverseStore {
   zoomOut: () => void;
   enterUniverse: () => void;
   resetCamera: () => void; // triggers camera to return to default position for current level
+  updatePlanetTexture: (planetId: string, textureUrl: string) => void;
+  updateSystemSkybox: (systemId: string, skyboxUrl: string) => void;
 
   // Derived getters
   currentGalaxy: () => Galaxy | null;
@@ -196,6 +198,48 @@ export const useUniverseStore = create<UniverseStore>((set, get) => ({
 
   resetCamera: () => {
     set((s) => ({ cameraResetTrigger: s.cameraResetTrigger + 1 }));
+  },
+
+  updatePlanetTexture: (planetId, textureUrl) => {
+    set((state) => {
+      if (!state.universe) return state;
+      const newUniverse = { ...state.universe };
+      
+      // Deep clone and find the planet
+      let updated = false;
+      for (const galaxy of newUniverse.galaxies) {
+        for (const system of galaxy.systems) {
+          const planetIndex = system.planets.findIndex(p => p.id === planetId);
+          if (planetIndex !== -1) {
+            system.planets[planetIndex] = { ...system.planets[planetIndex], textureUrl };
+            updated = true;
+            break;
+          }
+        }
+        if (updated) break;
+      }
+      
+      return updated ? { universe: newUniverse } : state;
+    });
+  },
+
+  updateSystemSkybox: (systemId, skyboxUrl) => {
+    set((state) => {
+      if (!state.universe) return state;
+      const newUniverse = { ...state.universe };
+      
+      let updated = false;
+      for (const galaxy of newUniverse.galaxies) {
+        const sysIndex = galaxy.systems.findIndex(s => s.id === systemId);
+        if (sysIndex !== -1) {
+          galaxy.systems[sysIndex] = { ...galaxy.systems[sysIndex], skyboxUrl };
+          updated = true;
+          break;
+        }
+      }
+      
+      return updated ? { universe: newUniverse } : state;
+    });
   },
 
   // Derived

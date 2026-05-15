@@ -34,7 +34,7 @@ const VIEW_CONFIGS: Record<ZoomLevel, {
   universe: { minDist: 40, maxDist: 400, pos: [0, 110, 140], look: [0, -15, 0] },
   galaxy: { minDist: 8, maxDist: 70, pos: [10, 22, 35], look: [0, -2, 0] },
   system: { minDist: 8, maxDist: 60, pos: [15, 16, 28], look: [0, -1, 0] },
-  planet: { minDist: 3, maxDist: 20, pos: [4, 2, 6], look: [0, 0, 0] },
+  planet: { minDist: 3.25, maxDist: 15, pos: [0, 1.5, 7.5], look: [0, 0, 0] },
 };
 
 const MIN_POLAR = 0.1; // prevent gimbal lock at top

@@ -7,10 +7,16 @@
 
 import { useParams } from "next/navigation";
 import { useUniverseStore } from "@/lib/store";
+import { useState, useEffect, useCallback } from "react";
 
 export default function PlanetPage() {
   const params = useParams<{ galaxyId: string; systemId: string; planetId: string }>();
   const { galaxyId, systemId, planetId } = params;
+  
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState("");
+
+  const updatePlanetTexture = useUniverseStore((s) => s.updatePlanetTexture);
 
   const planet = useUniverseStore((s) => {
     if (!s.universe) return null;
@@ -27,6 +33,72 @@ export default function PlanetPage() {
     if (!galaxy) return null;
     return galaxy.systems.find((sys) => sys.id === systemId) ?? null;
   });
+
+  const generateTexture = useCallback(
+    async (force = false) => {
+      if (!planet || isScanning) return;
+      if (!force && planet.textureUrl) return;
+
+      setIsScanning(true);
+      setScanStatus(force ? "RESYNTHESIZING SURFACE MAP..." : "SYNTHESIZING ATMOSPHERIC DATA...");
+
+      try {
+        const res = await fetch("/api/generate-planet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planet: {
+              name: planet.name,
+              type: planet.type,
+              habitable: planet.habitable,
+              orbitRadius: planet.orbitRadius,
+              size: planet.size,
+            },
+            system: system
+              ? {
+                  spectralClass: system.spectralClass,
+                  hasBlackHole: system.hasBlackHole,
+                  temperature: system.temperature,
+                }
+              : undefined,
+          }),
+        });
+
+        if (!res.ok) throw new Error("API Failed");
+
+        const data = await res.json();
+
+        if (data.imageUrl) {
+          setScanStatus("DECODING SURFACE TOPOGRAPHY...");
+          const img = new Image();
+          img.src = data.imageUrl;
+          img.onload = () => {
+            updatePlanetTexture(planetId, data.imageUrl);
+            setIsScanning(false);
+          };
+          img.onerror = () => setIsScanning(false);
+          return;
+        }
+
+        setIsScanning(false);
+      } catch (err) {
+        console.error(err);
+        setIsScanning(false);
+      }
+    },
+    [isScanning, planet, planetId, system, updatePlanetTexture],
+  );
+
+  // Automatically trigger AI generation if we don't have a texture
+  useEffect(() => {
+    if (!planet || planet.textureUrl || isScanning) return;
+
+    // Small delay to let the initial zoom animation start before blocking the thread with fetch
+    const t = setTimeout(() => {
+      void generateTexture(false);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [planet, generateTexture, isScanning]);
 
   return (
     <div className="flex flex-col flex-1 relative z-10 pointer-events-none">
@@ -58,13 +130,39 @@ export default function PlanetPage() {
             <div className="space-y-3">
               <PlanetStat label="Type" value={planet.type} />
               <PlanetStat label="Orbit" value={`${planet.orbitRadius.toFixed(1)} AU`} />
-              <PlanetStat label="Radius" value={`${planet.size.toFixed(2)} R⊕`} />
+              <PlanetStat label="Radius" value={`${planet.size.toFixed(2)} Re`} />
               <PlanetStat
                 label="Habitable"
-                value={planet.habitable ? "Confirmed" : "Negative"}
+                value={planet.habitable ? "CONFIRMED" : "NEGATIVE"}
                 highlight={planet.habitable}
               />
             </div>
+
+            {/* AI Generation Status Overlay */}
+            {isScanning && (
+              <div className="mt-6 p-4 border border-emerald-500/30 bg-emerald-500/10 rounded-lg animate-pulse">
+                <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-emerald-400">
+                  {scanStatus}
+                </p>
+                <div className="h-1 bg-emerald-500/20 w-full mt-3 rounded overflow-hidden">
+                  <div className="h-full bg-emerald-400 w-full animate-[progress_1.5s_ease-in-out_infinite]" style={{ transformOrigin: "left" }} />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                void generateTexture(true);
+              }}
+              disabled={isScanning}
+              className="mt-4 w-full text-left font-mono text-[10px] tracking-[0.2em] uppercase px-3 py-2 border border-white/10 rounded transition-all duration-300 pointer-events-auto cursor-pointer text-white/60 hover:text-white/80 hover:bg-white/[0.04] hover:border-white/20 disabled:cursor-not-allowed disabled:text-white/25"
+            >
+              {isScanning
+                ? "Rendering texture..."
+                : planet.textureUrl
+                  ? "Regenerate texture"
+                  : "Generate texture"}
+            </button>
 
             {/* Civilization section */}
             {planet.habitable && (
@@ -115,9 +213,9 @@ export default function PlanetPage() {
 
       {/* Instructions */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center select-none">
-        <div className="bg-black/50 backdrop-blur-sm rounded-full px-6 py-2.5 border border-white/[0.08]">
+        <div className="bg-black/50 backdrop-blur-sm rounded-full px-6 py-2.5 border border-white/[0.08] pointer-events-none">
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/60">
-            Orbit to inspect &middot; Esc to return to system
+            Orbit to inspect &middot; Scroll to enter atmosphere &middot; Esc to return to system
           </p>
         </div>
       </div>
@@ -147,7 +245,7 @@ function PlanetStat({
       <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-white/30">
         {label}
       </span>
-      <span className={`font-mono text-[10px] tracking-wide ${
+      <span className={`font-mono text-[10px] tracking-wide uppercase ${
         highlight ? "text-emerald-400/70" : "text-white/50"
       }`}>
         {value}
