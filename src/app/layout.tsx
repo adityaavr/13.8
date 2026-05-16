@@ -6,7 +6,11 @@ import { UniverseInitializer } from "@/components/universe-initializer";
 import { NavigationController } from "@/components/navigation-controller";
 import { CameraControlsUI } from "@/components/camera-controls-ui";
 import { OnboardingHints } from "@/components/onboarding-hints";
-import { FinalReport } from "@/components/final-report";
+import { SurveyLauncher } from "@/components/survey-launcher";
+import { SurveyReport } from "@/components/survey-report";
+import { FinalVerdict } from "@/components/final-verdict";
+import { LonelinessCounter } from "@/components/loneliness-counter";
+import { TransientSignalAlert } from "@/components/transient-signal-alert";
 import { AudioController } from "@/components/audio-controller";
 import { TimeScrubber } from "@/components/time-scrubber";
 
@@ -48,7 +52,11 @@ export default function RootLayout({
         <NavigationController />
         <CameraControlsUI />
         <OnboardingHints />
-        <FinalReport />
+        <LonelinessCounter />
+        <TransientSignalAlert />
+        <SurveyLauncher />
+        <SurveyReport />
+        <FinalVerdict />
         <AudioController />
         <TimeScrubber />
         {children}

@@ -129,3 +129,64 @@
     @apply font-sans;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Scan HUD — NMS-style discovery annotation animations
+   --------------------------------------------------------------------------- */
+
+@keyframes scanPinIn {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.6); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes scanPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(125, 211, 252, 0); }
+}
+
+@keyframes scanLineDraw {
+  0%   { stroke-dashoffset: 200; opacity: 0; }
+  20%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes scanLabelIn {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scanSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.scan-pin {
+  animation: scanPinIn 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both,
+             scanPulse 2.4s ease-in-out 800ms infinite;
+}
+
+.scan-line path,
+.scan-line line {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: scanLineDraw 480ms ease-out 180ms both;
+}
+
+.scan-label {
+  animation: scanLabelIn 320ms ease-out 540ms both;
+}
+
+.scan-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(125, 211, 252, 0.18) 50%,
+    transparent 100%
+  );
+  animation: scanSweep 1200ms ease-out 540ms both;
+  pointer-events: none;
+}

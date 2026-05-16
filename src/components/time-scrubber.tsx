@@ -1,5 +1,17 @@
 "use client";
 
+// ---------------------------------------------------------------------------
+// 13.8 — Cosmic Timeline (Time Scrubber)
+//
+// Plays the universe forward from epoch 0 → 13.8 Gyr. During playback:
+//   - Active civilizations appear / disappear on the universe map
+//   - Loneliness accumulates (civ-years without contact)
+//   - Scheduled SignalEvents fire when epoch crosses their atGyr
+//   - When playback completes, the Final Verdict cinematic opens
+//
+// Speed is configurable; default ~0.5 Gyr/sec → ~28s for a full run.
+// ---------------------------------------------------------------------------
+
 import { useEffect, useMemo, useRef } from "react";
 import {
   UNIVERSE_AGE_GYR,
@@ -8,7 +20,7 @@ import {
 } from "@/lib/civilization-epoch";
 import { useUniverseStore } from "@/lib/store";
 
-const PLAY_RATE_GYR_PER_SECOND = 0.35;
+const PLAY_RATE_GYR_PER_SECOND = 0.5;
 
 export function TimeScrubber() {
   const zoomLevel = useUniverseStore((s) => s.zoomLevel);
@@ -17,6 +29,10 @@ export function TimeScrubber() {
   const isEpochPlaying = useUniverseStore((s) => s.isEpochPlaying);
   const setEpochGyr = useUniverseStore((s) => s.setEpochGyr);
   const setEpochPlaying = useUniverseStore((s) => s.setEpochPlaying);
+  const accrueLoneliness = useUniverseStore((s) => s.accrueLoneliness);
+  const fireSignal = useUniverseStore((s) => s.fireSignal);
+  const firedSignalIds = useUniverseStore((s) => s.firedSignalIds);
+  const openVerdict = useUniverseStore((s) => s.openVerdict);
 
   const epochRef = useRef(epochGyr);
 
@@ -31,9 +47,9 @@ export function TimeScrubber() {
     }
   }, [zoomLevel, isEpochPlaying, setEpochPlaying]);
 
-  // Timeline playback loop.
+  // Timeline playback loop
   useEffect(() => {
-    if (!isEpochPlaying || zoomLevel !== "universe") return;
+    if (!isEpochPlaying || zoomLevel !== "universe" || !universe) return;
 
     let rafId = 0;
     let prev = performance.now();
@@ -42,15 +58,36 @@ export function TimeScrubber() {
       const deltaSeconds = (now - prev) / 1000;
       prev = now;
 
+      const prevEpoch = epochRef.current;
       const nextEpoch = clampEpochGyr(
-        epochRef.current + deltaSeconds * PLAY_RATE_GYR_PER_SECOND,
+        prevEpoch + deltaSeconds * PLAY_RATE_GYR_PER_SECOND,
       );
 
       epochRef.current = nextEpoch;
       setEpochGyr(nextEpoch);
 
+      // Accrue loneliness: active civs × elapsed epoch time, in Gyr·civ.
+      const active = countActiveCivilizations(universe, nextEpoch);
+      const dEpoch = nextEpoch - prevEpoch;
+      if (active > 0 && dEpoch > 0) {
+        accrueLoneliness(active * dEpoch);
+      }
+
+      // Fire any signal events crossed in this step
+      for (const ev of universe.signalEvents) {
+        if (
+          ev.atGyr > prevEpoch &&
+          ev.atGyr <= nextEpoch &&
+          !firedSignalIds.has(ev.id)
+        ) {
+          fireSignal(ev);
+        }
+      }
+
       if (nextEpoch >= UNIVERSE_AGE_GYR) {
         setEpochPlaying(false);
+        // Open the verdict after a beat of silence
+        setTimeout(() => openVerdict(), 1500);
         return;
       }
 
@@ -58,9 +95,18 @@ export function TimeScrubber() {
     };
 
     rafId = requestAnimationFrame(tick);
-
     return () => cancelAnimationFrame(rafId);
-  }, [isEpochPlaying, setEpochGyr, setEpochPlaying, zoomLevel]);
+  }, [
+    isEpochPlaying,
+    zoomLevel,
+    universe,
+    setEpochGyr,
+    setEpochPlaying,
+    accrueLoneliness,
+    fireSignal,
+    firedSignalIds,
+    openVerdict,
+  ]);
 
   const activeSignals = useMemo(
     () => countActiveCivilizations(universe, epochGyr),
@@ -74,12 +120,10 @@ export function TimeScrubber() {
       setEpochPlaying(false);
       return;
     }
-
     if (epochGyr >= UNIVERSE_AGE_GYR - 0.0001) {
       setEpochGyr(0);
       epochRef.current = 0;
     }
-
     setEpochPlaying(true);
   };
 
@@ -104,7 +148,8 @@ export function TimeScrubber() {
           Epoch {epochGyr.toFixed(2)} Gyr
         </p>
         <p className="font-mono text-[10px] tracking-[0.12em] text-white/38 mt-1 tabular-nums">
-          {lookbackGyr.toFixed(2)} Gyr ago | {activeSignals} active signals
+          {lookbackGyr.toFixed(2)} Gyr ago · {activeSignals} active{" "}
+          {activeSignals === 1 ? "signal" : "signals"}
         </p>
 
         <input

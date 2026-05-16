@@ -19,67 +19,31 @@ import { Billboard, Text, Ring, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { useUniverseStore } from "@/lib/store";
 import { BlackHole } from "./black-hole";
+import { PlasmaStar } from "./plasma-star-shader";
+import { HabitableZone } from "./habitable-zone";
+import { Atmosphere } from "./atmosphere-shader";
 import type { Planet, StarSystem } from "@/lib/types";
 
+
 // ---------------------------------------------------------------------------
-// Central Star
+// Central Star — uses the plasma shader for surface convection + corona
 // ---------------------------------------------------------------------------
 
 function Star({ system }: { system: StarSystem }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
-  const [r, g, b] = system.starColor;
-  const color = new THREE.Color(r, g, b);
-
-  useFrame(({ clock }) => {
-    if (glowRef.current) {
-      // Subtle pulse
-      const pulse = 1 + Math.sin(clock.elapsedTime * 0.8) * 0.05;
-      glowRef.current.scale.setScalar(pulse);
-    }
-  });
-
-  return (
-    <group>
-      {/* Core sphere */}
-      <mesh ref={meshRef}>
-        <sphereGeometry args={[1.8, 32, 32]} />
-        <meshBasicMaterial color={color} toneMapped={false} />
-      </mesh>
-
-      {/* Soft glow halo */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[3.5, 16, 16]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.08}
-          toneMapped={false}
-          side={THREE.BackSide}
-        />
-      </mesh>
-
-      {/* Outer glow */}
-      <mesh>
-        <sphereGeometry args={[6, 16, 16]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.025}
-          toneMapped={false}
-          side={THREE.BackSide}
-        />
-      </mesh>
-
-      {/* Point light to illuminate planets */}
-      <pointLight
-        color={color}
-        intensity={2}
-        distance={60}
-        decay={2}
-      />
-    </group>
+  const color = useMemo(
+    () => new THREE.Color(system.starColor[0], system.starColor[1], system.starColor[2]),
+    [system.starColor],
   );
+
+  // Hotter stars are more "active" — convection runs faster
+  const activity =
+    system.spectralClass === "O" || system.spectralClass === "B"
+      ? 2.0
+      : system.spectralClass === "M" || system.spectralClass === "K"
+      ? 0.6
+      : 1.0;
+
+  return <PlasmaStar radius={1.8} color={color} activity={activity} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +81,16 @@ function OrbitalRing({ radius, habitable }: { radius: number; habitable: boolean
 // Planet
 // ---------------------------------------------------------------------------
 
+// Per-planet atmosphere tints — match planet biome
+const PLANET_ATMOS: Record<Planet["type"], [number, number, number]> = {
+  rocky: [0.55, 0.7, 1.0],
+  gas: [0.95, 0.7, 0.35],
+  ice: [0.7, 0.9, 1.0],
+  ocean: [0.35, 0.7, 1.0],
+  desert: [1.0, 0.78, 0.45],
+  volcanic: [1.0, 0.35, 0.15],
+};
+
 function PlanetMesh({
   planet,
   isSelected,
@@ -128,33 +102,43 @@ function PlanetMesh({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const surfaceRef = useRef<THREE.Mesh>(null);
+  // Stable Vector3 mutated each frame — Atmosphere reads it by reference
+  const sunDir = useMemo(() => new THREE.Vector3(1, 0, 0), []);
   const [r, g, b] = planet.color;
+  const planetRadius = planet.size * 0.4;
 
   useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-
-    // Orbit animation
     const time = clock.elapsedTime;
-    const angle = planet.orbitOffset + time * planet.orbitSpeed;
-    groupRef.current.position.set(
-      Math.cos(angle) * planet.orbitRadius,
-      0,
-      Math.sin(angle) * planet.orbitRadius,
-    );
 
-    // Habitable glow pulse
+    if (groupRef.current) {
+      const angle = planet.orbitOffset + time * planet.orbitSpeed;
+      const px = Math.cos(angle) * planet.orbitRadius;
+      const pz = Math.sin(angle) * planet.orbitRadius;
+      groupRef.current.position.set(px, 0, pz);
+
+      // Sun direction = unit vector from planet toward origin (star)
+      sunDir.set(-px, 0, -pz).normalize();
+    }
+
+    if (surfaceRef.current) {
+      surfaceRef.current.rotation.y = time * 0.08;
+    }
+
     if (glowRef.current && planet.habitable) {
       const pulse = 1 + Math.sin(time * 1.5) * 0.15;
       glowRef.current.scale.setScalar(pulse);
     }
   });
 
-  const planetColor = new THREE.Color(r, g, b);
+  const planetColor = useMemo(() => new THREE.Color(r, g, b), [r, g, b]);
+  const atmosColor = PLANET_ATMOS[planet.type];
 
   return (
     <group ref={groupRef}>
-      {/* Planet sphere */}
+      {/* Planet sphere — bumped subdivisions for smoother orbital appearance */}
       <mesh
+        ref={surfaceRef}
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
@@ -162,15 +146,23 @@ function PlanetMesh({
         onPointerOver={() => { document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { document.body.style.cursor = "default"; }}
       >
-        <sphereGeometry args={[planet.size * 0.4, 24, 24]} />
+        <sphereGeometry args={[planetRadius, 48, 48]} />
         <meshStandardMaterial
           color={planetColor}
-          roughness={0.7}
-          metalness={0.1}
+          roughness={0.78}
+          metalness={0.05}
           emissive={planetColor}
-          emissiveIntensity={0.05}
+          emissiveIntensity={0.03}
         />
       </mesh>
+
+      {/* Atmosphere — Fresnel rim glow with sun-side warm scattering */}
+      <Atmosphere
+        radius={planetRadius}
+        color={atmosColor}
+        sunDirection={sunDir}
+        intensity={planet.habitable ? 0.85 : 0.55}
+      />
 
       {/* Selection ring */}
       {isSelected && (
@@ -249,10 +241,17 @@ export function StarSystemView() {
   // Only render when zoomed into a system
   if (zoomLevel !== "system" || !system) return null;
 
+  // Show the habitable zone halo only for normal stars (not black-hole systems)
+  // and only if at least one planet sits in or near the band.
+  const hasHabitable = system.planets.some((p) => p.habitable);
+
   return (
     <group>
       {/* Central body — star or black hole */}
       {system.hasBlackHole ? <BlackHole /> : <Star system={system} />}
+
+      {/* Habitable Goldilocks band — soft green glow */}
+      {!system.hasBlackHole && hasHabitable && <HabitableZone />}
 
       {/* Orbital rings */}
       {system.planets.map((planet) => (

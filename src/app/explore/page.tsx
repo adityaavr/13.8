@@ -21,11 +21,16 @@ export default function UniverseMapPage() {
         habitableWorlds += s.planets.filter((p) => p.habitable).length;
       });
     });
+    const activeSignals = countActiveCivilizations(universe, epochGyr);
+    // "Civilizations detected" = active right now. "Transient signals" = the
+    // ones that have ever existed in this universe (haunting context).
+    const totalTraces = universe.civilizations.length;
     return {
       galaxies: universe.galaxies.length,
       totalSystems,
       habitableWorlds,
-      activeSignals: countActiveCivilizations(universe, epochGyr),
+      activeSignals,
+      totalTraces,
     };
   }, [universe, epochGyr]);
 
@@ -43,11 +48,11 @@ export default function UniverseMapPage() {
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/55 mt-2">
               {stats.galaxies} galaxies &middot; {stats.totalSystems} systems &middot; {stats.habitableWorlds} habitable worlds
             </p>
-            <p className="font-mono text-[10px] tracking-[0.4em] uppercase text-white/30 mt-1.5">
-              Civilizations detected now: 0
+            <p className="font-mono text-[10px] tracking-[0.4em] uppercase text-white/45 mt-1.5 tabular-nums">
+              Civilizations detected now: <span className={stats.activeSignals > 0 ? "text-cyan-200" : "text-white/55"}>{stats.activeSignals}</span> &middot; transient signals: <span className="text-white/55">{stats.totalTraces}</span>
             </p>
             <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-white/38 mt-1 tabular-nums">
-              Epoch {epochGyr.toFixed(2)} Gyr &middot; {lookbackGyr.toFixed(2)} Gyr ago &middot; {stats.activeSignals} transient signals
+              Epoch {epochGyr.toFixed(2)} Gyr &middot; {lookbackGyr.toFixed(2)} Gyr ago
             </p>
           </>
         )}

@@ -11,7 +11,15 @@ function CivilizationDot({ civilization }: { civilization: CivilizationTrace }) 
   const coreRef = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
 
-  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
+  // Stable per-civilization phase derived from id (so playback is deterministic)
+  const phase = useMemo(() => {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < civilization.id.length; i++) {
+      h ^= civilization.id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return ((h >>> 0) / 4294967296) * Math.PI * 2;
+  }, [civilization.id]);
   const color = useMemo(() => {
     const [r, g, b] = civilization.color;
     return new THREE.Color(r, g, b);

@@ -3,24 +3,28 @@
 // ---------------------------------------------------------------------------
 // 13.8 — Planet Detail View
 //
-// When zoomed to planet level, renders a large detailed planet at origin:
-// - Procedural terrain texture (colored by planet type)
-// - Atmosphere rim glow (fresnel-like edge glow)
-// - Cloud layer (translucent sphere with noise)
-// - Rings for gas giants
-// - Slow rotation
+// Large detailed planet at origin with:
+//   - Procedural terrain texture
+//   - Cloud layer (translucent noise)
+//   - NMS-style fresnel atmosphere — warm rim on sun side, cool on dark side
+//   - Rings for gas giants
+//   - Slow rotation
 //
-// NMS reference: detailed planets visible from orbit with atmosphere,
-// terrain variation, cloud patterns.
+// The atmosphere is now a custom shader (see atmosphere-shader.tsx) instead
+// of flat backside spheres. This is the single biggest visual upgrade.
 // ---------------------------------------------------------------------------
 
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useUniverseStore } from "@/lib/store";
+import { Atmosphere } from "./atmosphere-shader";
 import type { Planet, PlanetType } from "@/lib/types";
 
 const PLANET_RADIUS = 3;
+// Sun direction shared with scene.tsx's LensFlareSync (must match!)
+const SUN_POSITION = new THREE.Vector3(10, 5, 8);
+const SUN_DIRECTION = SUN_POSITION.clone().normalize();
 
 // ---------------------------------------------------------------------------
 // Procedural terrain texture
@@ -43,12 +47,12 @@ const TERRAIN_PALETTES: Record<PlanetType, TerrainPalette> = {
 };
 
 const ATMOSPHERE_COLORS: Record<PlanetType, [number, number, number]> = {
-  rocky: [0.6, 0.7, 0.9],
-  gas: [0.8, 0.6, 0.3],
-  ice: [0.7, 0.85, 1.0],
-  ocean: [0.3, 0.6, 1.0],
-  desert: [0.9, 0.75, 0.5],
-  volcanic: [0.9, 0.3, 0.1],
+  rocky: [0.55, 0.7, 1.0],
+  gas: [0.95, 0.7, 0.35],
+  ice: [0.7, 0.9, 1.0],
+  ocean: [0.35, 0.7, 1.0],
+  desert: [1.0, 0.78, 0.45],
+  volcanic: [1.0, 0.35, 0.15],
 };
 
 function createTerrainTexture(type: PlanetType, seed: number): THREE.DataTexture {
@@ -56,7 +60,6 @@ function createTerrainTexture(type: PlanetType, seed: number): THREE.DataTexture
   const data = new Uint8Array(size * size * 4);
   const palette = TERRAIN_PALETTES[type];
 
-  // Simple seeded noise using sine combinations
   const noise = (x: number, y: number, freq: number) =>
     Math.sin(x * freq + seed * 1.3) * Math.cos(y * freq + seed * 0.7) * 0.5 + 0.5;
 
@@ -75,7 +78,6 @@ function createTerrainTexture(type: PlanetType, seed: number): THREE.DataTexture
       const ny = y / size;
       const n = fbm(nx * 10, ny * 10);
 
-      // Map noise to terrain colors
       let r: number, g: number, b: number;
       if (n < 0.35) {
         const t = n / 0.35;
@@ -105,12 +107,13 @@ function createTerrainTexture(type: PlanetType, seed: number): THREE.DataTexture
   const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
 }
 
 // ---------------------------------------------------------------------------
-// Cloud texture — translucent noise
+// Cloud texture
 // ---------------------------------------------------------------------------
 
 function createCloudTexture(seed: number): THREE.DataTexture {
@@ -129,14 +132,13 @@ function createCloudTexture(seed: number): THREE.DataTexture {
       n += noise(nx * 10, ny * 10, 8) * 0.3;
       n += noise(nx * 20, ny * 20, 16) * 0.2;
 
-      // Only show clouds above a threshold
       const alpha = Math.max(0, (n - 0.4) * 2.5);
 
       const idx = (y * size + x) * 4;
       data[idx] = 255;
       data[idx + 1] = 255;
       data[idx + 2] = 255;
-      data[idx + 3] = Math.floor(Math.min(1, alpha) * 180);
+      data[idx + 3] = Math.floor(Math.min(1, alpha) * 200);
     }
   }
 
@@ -148,13 +150,16 @@ function createCloudTexture(seed: number): THREE.DataTexture {
 }
 
 // ---------------------------------------------------------------------------
-// Planet Sphere
+// Planet
 // ---------------------------------------------------------------------------
 
 function PlanetSphere({ planet }: { planet: Planet }) {
   const surfaceRef = useRef<THREE.Mesh>(null);
   const cloudRef = useRef<THREE.Mesh>(null);
-  const seed = useMemo(() => planet.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0), [planet.id]);
+  const seed = useMemo(
+    () => planet.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0),
+    [planet.id],
+  );
 
   const terrainTex = useMemo(() => createTerrainTexture(planet.type, seed), [planet.type, seed]);
   const cloudTex = useMemo(() => createCloudTexture(seed + 100), [seed]);
@@ -170,74 +175,60 @@ function PlanetSphere({ planet }: { planet: Planet }) {
     <group>
       {/* Planet surface */}
       <mesh ref={surfaceRef}>
-        <sphereGeometry args={[PLANET_RADIUS, 64, 64]} />
+        <sphereGeometry args={[PLANET_RADIUS, 96, 96]} />
         <meshStandardMaterial
           map={terrainTex}
-          roughness={0.85}
-          metalness={0.05}
+          roughness={0.92}
+          metalness={0.02}
         />
       </mesh>
 
       {/* Cloud layer */}
       {planet.type !== "gas" && (
         <mesh ref={cloudRef}>
-          <sphereGeometry args={[PLANET_RADIUS * 1.01, 48, 48]} />
-          <meshBasicMaterial
+          <sphereGeometry args={[PLANET_RADIUS * 1.012, 64, 64]} />
+          <meshStandardMaterial
             map={cloudTex}
             transparent
-            opacity={planet.type === "ocean" ? 0.7 : 0.45}
+            opacity={planet.type === "ocean" ? 0.85 : 0.55}
             depthWrite={false}
+            roughness={1}
+            metalness={0}
           />
         </mesh>
       )}
 
-      {/* Atmosphere rim glow — inner */}
-      <mesh>
-        <sphereGeometry args={[PLANET_RADIUS * 1.04, 48, 48]} />
-        <meshBasicMaterial
-          color={new THREE.Color(atmosColor[0], atmosColor[1], atmosColor[2])}
-          transparent
-          opacity={0.15}
-          side={THREE.BackSide}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* Atmosphere rim glow — outer (wider, fainter) */}
-      <mesh>
-        <sphereGeometry args={[PLANET_RADIUS * 1.12, 48, 48]} />
-        <meshBasicMaterial
-          color={new THREE.Color(atmosColor[0] * 0.8, atmosColor[1] * 0.8, atmosColor[2] * 0.8)}
-          transparent
-          opacity={0.06}
-          side={THREE.BackSide}
-          toneMapped={false}
-        />
-      </mesh>
+      {/* Fresnel atmosphere — the NMS hallmark */}
+      <Atmosphere
+        radius={PLANET_RADIUS}
+        color={atmosColor}
+        sunDirection={SUN_DIRECTION}
+        intensity={planet.type === "volcanic" ? 1.4 : 1.0}
+      />
 
       {/* Gas giant rings */}
       {planet.type === "gas" && (
         <mesh rotation={[-Math.PI * 0.4, 0.2, 0]}>
           <ringGeometry args={[PLANET_RADIUS * 1.4, PLANET_RADIUS * 2.2, 128]} />
           <meshBasicMaterial
-            color={new THREE.Color(0.8, 0.7, 0.55)}
+            color={new THREE.Color(0.85, 0.72, 0.55)}
             transparent
-            opacity={0.25}
+            opacity={0.32}
             side={THREE.DoubleSide}
             toneMapped={false}
           />
         </mesh>
       )}
 
-      {/* Directional light — star illumination */}
+      {/* Sun illumination — strong directional + warm tint */}
       <directionalLight
-        position={[10, 5, 8]}
-        intensity={1.5}
+        position={SUN_POSITION}
+        intensity={2.0}
         color={new THREE.Color(1, 0.95, 0.85)}
       />
 
-      {/* Ambient for dark side */}
-      <ambientLight intensity={0.08} />
+      {/* Dark-side ambient — subtle blue, sells the night terminator */}
+      <ambientLight intensity={0.06} color={new THREE.Color(0.6, 0.7, 1.0)} />
     </group>
   );
 }
@@ -248,7 +239,6 @@ function PlanetSphere({ planet }: { planet: Planet }) {
 
 export function PlanetDetailView() {
   const zoomLevel = useUniverseStore((s) => s.zoomLevel);
-  const selectedPlanetId = useUniverseStore((s) => s.selectedPlanetId);
 
   const planet = useUniverseStore((s) => {
     if (!s.universe || !s.selectedGalaxyId || !s.selectedSystemId || !s.selectedPlanetId) return null;

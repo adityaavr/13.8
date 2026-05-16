@@ -60,36 +60,37 @@ function rand(min: number, max: number) {
 }
 
 function pickPalette(): NebulaPalette {
+  // Pushed saturation across the board — NMS palette is genuinely vivid.
   const palettes: NebulaPalette[] = [
     {
-      // Amber gold (NMS screenshot 1)
-      far: [[0.45, 0.30, 0.08], [0.35, 0.22, 0.05], [0.50, 0.35, 0.10]],
-      mid: [[0.55, 0.35, 0.10], [0.40, 0.25, 0.06], [0.60, 0.40, 0.12]],
-      near: [[0.50, 0.32, 0.08], [0.45, 0.28, 0.06]],
+      // Amber-gold storm
+      far: [[0.85, 0.50, 0.12], [0.70, 0.38, 0.08], [0.95, 0.62, 0.18]],
+      mid: [[1.00, 0.58, 0.15], [0.78, 0.42, 0.10], [1.10, 0.72, 0.22]],
+      near: [[0.92, 0.56, 0.14], [0.85, 0.48, 0.10]],
     },
     {
-      // Purple-magenta (NMS screenshot 2)
-      far: [[0.30, 0.10, 0.35], [0.25, 0.08, 0.30], [0.35, 0.12, 0.40]],
-      mid: [[0.40, 0.12, 0.45], [0.30, 0.10, 0.35], [0.45, 0.15, 0.50]],
-      near: [[0.35, 0.12, 0.38], [0.28, 0.08, 0.32]],
+      // Magenta-violet — the iconic NMS sky
+      far: [[0.62, 0.18, 0.72], [0.50, 0.14, 0.60], [0.72, 0.22, 0.82]],
+      mid: [[0.82, 0.22, 0.88], [0.60, 0.18, 0.70], [0.92, 0.30, 1.00]],
+      near: [[0.72, 0.24, 0.78], [0.58, 0.16, 0.66]],
     },
     {
-      // Deep teal-blue
-      far: [[0.05, 0.20, 0.30], [0.08, 0.25, 0.35], [0.04, 0.18, 0.28]],
-      mid: [[0.06, 0.28, 0.38], [0.10, 0.32, 0.42], [0.04, 0.22, 0.32]],
-      near: [[0.06, 0.25, 0.35], [0.08, 0.20, 0.30]],
+      // Cyan-teal deep
+      far: [[0.10, 0.50, 0.72], [0.16, 0.58, 0.82], [0.08, 0.42, 0.66]],
+      mid: [[0.12, 0.62, 0.84], [0.22, 0.72, 0.94], [0.08, 0.48, 0.70]],
+      near: [[0.14, 0.58, 0.78], [0.18, 0.50, 0.70]],
     },
     {
-      // Warm rose-violet
-      far: [[0.35, 0.12, 0.25], [0.28, 0.10, 0.22], [0.40, 0.15, 0.30]],
-      mid: [[0.42, 0.14, 0.30], [0.35, 0.12, 0.25], [0.48, 0.18, 0.35]],
-      near: [[0.38, 0.12, 0.28], [0.32, 0.10, 0.22]],
+      // Rose-violet with crimson hearts
+      far: [[0.78, 0.22, 0.50], [0.62, 0.18, 0.42], [0.88, 0.28, 0.58]],
+      mid: [[0.92, 0.26, 0.58], [0.72, 0.22, 0.46], [1.00, 0.34, 0.66]],
+      near: [[0.82, 0.24, 0.52], [0.70, 0.20, 0.42]],
     },
     {
-      // Emerald-teal with amber accents
-      far: [[0.08, 0.28, 0.18], [0.10, 0.32, 0.22], [0.30, 0.22, 0.08]],
-      mid: [[0.10, 0.35, 0.24], [0.35, 0.28, 0.10], [0.12, 0.30, 0.20]],
-      near: [[0.10, 0.30, 0.20], [0.28, 0.22, 0.08]],
+      // Emerald-amber binary (NMS rare biome)
+      far: [[0.14, 0.62, 0.40], [0.18, 0.72, 0.48], [0.68, 0.50, 0.16]],
+      mid: [[0.18, 0.78, 0.50], [0.78, 0.60, 0.20], [0.22, 0.66, 0.42]],
+      near: [[0.20, 0.68, 0.42], [0.62, 0.50, 0.16]],
     },
   ];
   return palettes[Math.floor(Math.random() * palettes.length)];
@@ -132,12 +133,12 @@ function generateClouds(palette: NebulaPalette): Cloud[] {
         sx: rand(0.00003, 0.0001), sy: rand(0.00002, 0.00008), sz: rand(0.00003, 0.0001),
         ox: rand(0, 100), oy: rand(0, 100), oz: rand(0, 100),
       },
-      opacity: rand(0.12, 0.25),
+      opacity: rand(0.08, 0.16),
     });
   }
 
   // --- Mid-layer clouds — defined shapes, moderate size ---
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     const c = pick(palette.mid);
     const phi = rand(0, Math.PI * 2);
     const theta = rand(0.5, 2.5);
@@ -154,12 +155,12 @@ function generateClouds(palette: NebulaPalette): Cloud[] {
         sx: rand(0.00005, 0.00015), sy: rand(0.00004, 0.00012), sz: rand(0.00005, 0.00015),
         ox: rand(0, 100), oy: rand(0, 100), oz: rand(0, 100),
       },
-      opacity: rand(0.08, 0.18),
+      opacity: rand(0.05, 0.12),
     });
   }
 
   // --- Near dust wisps — smaller, parallax depth ---
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 14; i++) {
     const c = pick(palette.near);
     const phi = rand(0, Math.PI * 2);
     const theta = rand(0.6, 2.4);
@@ -176,7 +177,30 @@ function generateClouds(palette: NebulaPalette): Cloud[] {
         sx: rand(0.0001, 0.0003), sy: rand(0.00008, 0.0002), sz: rand(0.0001, 0.0003),
         ox: rand(0, 100), oy: rand(0, 100), oz: rand(0, 100),
       },
-      opacity: rand(0.06, 0.12),
+      opacity: rand(0.04, 0.08),
+    });
+  }
+
+  // --- Very-near wisps — sit close to the camera frustum for strong
+  //     parallax during dolly/zoom transitions. Smaller and darker. ---
+  for (let i = 0; i < 8; i++) {
+    const c = pick(palette.near);
+    const phi = rand(0, Math.PI * 2);
+    const theta = rand(0.7, 2.3);
+    const r = rand(12, 35);
+    clouds.push({
+      position: new THREE.Vector3(
+        Math.sin(theta) * Math.cos(phi) * r,
+        Math.cos(theta) * r * 0.4,
+        Math.sin(theta) * Math.sin(phi) * r,
+      ),
+      color: new THREE.Color(c[0], c[1], c[2]),
+      size: rand(10, 28),
+      drift: {
+        sx: rand(0.0002, 0.0005), sy: rand(0.00015, 0.0004), sz: rand(0.0002, 0.0005),
+        ox: rand(0, 100), oy: rand(0, 100), oz: rand(0, 100),
+      },
+      opacity: rand(0.03, 0.06),
     });
   }
 
